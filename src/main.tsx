@@ -88,7 +88,9 @@ function convertEntityMap(
 }
 
 export function Main() {
+  const [allMetas, setAllMetas] = useState([] as Meta[]);
   const [metas, setMetas] = useState([] as Meta[]);
+  const [keyword, setKeyword] = useState("");
 
   useEffect(() => {
     async function fetchData() {
@@ -105,13 +107,26 @@ export function Main() {
       const obj = toml.parse(text);
       console.log(`${new Date().toISOString()} parseData`);
       const data = parseData(obj);
-      // console.log(data);
       console.log(`${new Date().toISOString()} setMetas`);
+      setAllMetas(data);
       setMetas(data);
     }
 
     fetchData();
   }, []);
+
+  useEffect(() => {
+    console.log(`${new Date().toISOString()} keyword: ${keyword}`);
+    const filtered = allMetas.filter((meta) => {
+      return (
+        meta.entity.toLowerCase().includes(keyword.toLowerCase()) ||
+        meta.project.toLowerCase().includes(keyword.toLowerCase()) ||
+        meta.dataset.toLowerCase().includes(keyword.toLowerCase())
+      );
+    });
+
+    setMetas(filtered);
+  }, [keyword]);
 
   return (
     <>
@@ -121,6 +136,11 @@ export function Main() {
         </a>
       </div>
       <h1>bqiam</h1>
+      <input
+        type="text"
+        placeholder="Search Keyword"
+        onChange={(e) => setKeyword(e.target.value)}
+      />
       {metas.length === 0 && (
         <>
           <p>Loading...</p>
@@ -133,7 +153,6 @@ export function Main() {
         {Object.entries(convertEntityMap(metas))
           .slice(0, 20)
           .map(([entry, projects]) => {
-            // console.log(projects);
             return (
               <div key={entry} className="card-item">
                 <h2>{entry}</h2>
