@@ -67,23 +67,34 @@ function parseData(data: unknown): Meta[] {
   return data.Metas.map(parseMeta);
 }
 
-// Meta[] -> Record<entity, Record<project, Record<dataset, role[]>>>
+// Meta[] -> Record<entity, { count: number; projects: Record<project, Record<dataset, role[]>> }>
 function convertEntityMap(
   metas: Meta[],
-): Record<string, Record<string, Record<string, string[]>>> {
-  return metas.reduce((acc, meta) => {
-    if (!(meta.entity in acc)) {
-      acc[meta.entity] = {};
-    }
-    if (!(meta.project in acc[meta.entity])) {
-      acc[meta.entity][meta.project] = {};
-    }
-    if (!(meta.dataset in acc[meta.entity][meta.project])) {
-      acc[meta.entity][meta.project][meta.dataset] = [];
-    }
-    acc[meta.entity][meta.project][meta.dataset].push(meta.role);
-    return acc;
-  }, {} as Record<string, Record<string, Record<string, string[]>>>);
+): Record<
+  string,
+  { count: number; projects: Record<string, Record<string, string[]>> }
+> {
+  return metas
+    .filter((meta) => !!meta.entity)
+    .reduce((acc, meta) => {
+      if (!(meta.entity in acc)) {
+        acc[meta.entity] = {
+          count: 0,
+          projects: {},
+        };
+      }
+      if (!(meta.project in acc[meta.entity].projects)) {
+        acc[meta.entity].projects[meta.project] = {};
+      }
+      if (!(meta.dataset in acc[meta.entity].projects[meta.project])) {
+        acc[meta.entity].projects[meta.project][meta.dataset] = [];
+      }
+
+      acc[meta.entity].projects[meta.project][meta.dataset].push(meta.role);
+      acc[meta.entity].count += 1;
+
+      return acc;
+    }, {} as Record<string, { count: number; projects: Record<string, Record<string, string[]>> }>);
 }
 
 export function Main() {
@@ -148,23 +159,29 @@ export function Main() {
       )}
       <div className="card">
         {Object.entries(convertEntityMap(metas))
-          .slice(0, 20)
-          .map(([entry, projects]) => {
+          .sort((a, b) => b[1].count - a[1].count)
+          .slice(0, 100)
+          .map(([entry, { count, projects }]) => {
             return (
               <div key={entry} className="card-item">
-                <h2>{entry}</h2>
-                {Object.entries(projects).map(([project, datasets]) => (
-                  <div key={project}>
-                    <h3>{project}</h3>
-                    <ul>
-                      {Object.entries(datasets).map(([dataset, roles]) => (
-                        <li key={dataset}>
-                          {dataset}: {roles.join(", ")}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+                <h2>
+                  {entry} ({count})
+                </h2>
+                {keyword &&
+                  Object.entries(projects).map(([project, datasets]) => (
+                    <div key={project}>
+                      <h3>
+                        {project} ({Object.keys(datasets).length})
+                      </h3>
+                      <ul>
+                        {Object.entries(datasets).map(([dataset, roles]) => (
+                          <li key={dataset}>
+                            {dataset}: {roles.join(", ")}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
               </div>
             );
           })}
