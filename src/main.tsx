@@ -3,11 +3,58 @@ import "./main.css";
 import reactLogo from "./assets/react.svg";
 import FarmLogo from "./assets/logo.png";
 
+// https://pkg.go.dev/cloud.google.com/go/bigquery@v1.61.0#EntityType
+const DomainEntity = 1 as const;
+const GroupEmailEntity = 2 as const;
+const UserEmailEntity = 3 as const;
+const SpecialGroupEntity = 4 as const;
+const ViewEntity = 5 as const;
+const IAMMemberEntity = 6 as const;
+const RoutineEntity = 7 as const;
+const DatasetEntity = 8 as const;
+type EntityType =
+  | typeof DomainEntity
+  | typeof GroupEmailEntity
+  | typeof UserEmailEntity
+  | typeof SpecialGroupEntity
+  | typeof ViewEntity
+  | typeof IAMMemberEntity
+  | typeof RoutineEntity
+  | typeof DatasetEntity;
+
+function entityTypeToString(entityType: EntityType, entity: string): string {
+  switch (entityType) {
+    case DomainEntity:
+      return "Domain";
+    case GroupEmailEntity:
+      return "Group";
+    case UserEmailEntity:
+      if (entity.endsWith(".iam.gserviceaccount.com")) {
+        return "ServiceAccount";
+      }
+      return "User";
+    case SpecialGroupEntity:
+      return "SpecialGroup";
+    case ViewEntity:
+      return "View";
+    case IAMMemberEntity:
+      return "IAMMember";
+    case RoutineEntity:
+      return "Routine";
+    case DatasetEntity:
+      return "Dataset";
+    default:
+      const n: never = entityType;
+      throw new Error(`Unknown EntityType: ${n}`);
+  }
+}
+
 type Meta = {
   project: string;
   dataset: string;
   role: string;
   entity: string;
+  entityType: EntityType;
 };
 
 function parseMeta(meta: unknown, i: number): Meta {
@@ -41,12 +88,22 @@ function parseMeta(meta: unknown, i: number): Meta {
   if (typeof meta.Entity !== "string") {
     throw new Error(`Metas[${i}].Entity is not a string`);
   }
+  if (!("EntityType" in meta)) {
+    throw new Error(`Metas[${i}].EntityType not found`);
+  }
+  if (typeof meta.EntityType !== "number") {
+    throw new Error(`Metas[${i}].EntityType is not a number`);
+  }
+  if (meta.EntityType < DomainEntity || meta.EntityType > DatasetEntity) {
+    throw new Error(`Metas[${i}].EntityType is out of range`);
+  }
 
   return {
     project: meta.Project,
     dataset: meta.Dataset,
     role: meta.Role,
     entity: meta.Entity,
+    entityType: meta.EntityType as EntityType,
   };
 }
 
@@ -68,17 +125,20 @@ function parseData(data: unknown): Meta[] {
 }
 
 // Meta[] -> Record<entity, { count: number; projects: Record<project, Record<dataset, role[]>> }>
-function convertEntityMap(
-  metas: Meta[],
-): Record<
+function convertEntityMap(metas: Meta[]): Record<
   string,
-  { count: number; projects: Record<string, Record<string, string[]>> }
+  {
+    entryType: EntityType;
+    count: number;
+    projects: Record<string, Record<string, string[]>>;
+  }
 > {
   return metas
     .filter((meta) => !!meta.entity)
     .reduce((acc, meta) => {
       if (!(meta.entity in acc)) {
         acc[meta.entity] = {
+          entryType: meta.entityType,
           count: 0,
           projects: {},
         };
@@ -97,7 +157,7 @@ function convertEntityMap(
         .reduce((acc, cur) => acc + cur, 0);
 
       return acc;
-    }, {} as Record<string, { count: number; projects: Record<string, Record<string, string[]>> }>);
+    }, {} as Record<string, { entryType: EntityType; count: number; projects: Record<string, Record<string, string[]>> }>);
 }
 
 export function Main() {
@@ -164,11 +224,11 @@ export function Main() {
         {Object.entries(convertEntityMap(metas))
           .sort((a, b) => b[1].count - a[1].count)
           .slice(0, 100)
-          .map(([entry, { count, projects }]) => {
+          .map(([entry, { entryType, count, projects }]) => {
             return (
               <div key={entry} className="card-item">
                 <h2>
-                  {entry} ({count})
+                  {entityTypeToString(entryType, entry)}:{entry} ({count})
                 </h2>
                 {keyword &&
                   Object.entries(projects).map(([project, datasets]) => (
