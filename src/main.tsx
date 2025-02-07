@@ -91,7 +91,10 @@ function convertEntityMap(
       }
 
       acc[meta.entity].projects[meta.project][meta.dataset].push(meta.role);
-      acc[meta.entity].count += 1;
+      // count unique datasets
+      acc[meta.entity].count = Object.values(acc[meta.entity].projects)
+        .map((p) => Object.keys(p).length)
+        .reduce((acc, cur) => acc + cur, 0);
 
       return acc;
     }, {} as Record<string, { count: number; projects: Record<string, Record<string, string[]>> }>);
