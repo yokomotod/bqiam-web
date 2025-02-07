@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import "./main.css";
 import reactLogo from "./assets/react.svg";
 import FarmLogo from "./assets/logo.png";
-import toml from "toml";
 
 type Meta = {
   project: string;
@@ -95,16 +94,14 @@ export function Main() {
   useEffect(() => {
     async function fetchData() {
       console.log(`${new Date().toISOString()} fetchData`);
-      const response = await fetch(".bqiam-cache-file.toml");
+      const response = await fetch(".bqiam-cache-file.json");
       if (!response.ok) {
         throw new Error(
           `.bqiam-cache-file.toml: ${response.status} ${response.statusText}`,
         );
       }
 
-      const text = await response.text();
-      console.log(`${new Date().toISOString()} toml.parse`);
-      const obj = toml.parse(text);
+      const obj = await response.json();
       console.log(`${new Date().toISOString()} parseData`);
       const data = parseData(obj);
       console.log(`${new Date().toISOString()} setMetas`);
